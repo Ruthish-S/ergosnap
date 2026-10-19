@@ -123,140 +123,82 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Dashboard Top Header & Selector */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-200 gap-3">
-        <div>
-          <div className="flex items-center space-x-2">
-            <h1 className="text-xl font-black text-slate-900 tracking-tight">
+      {/* Executive Assessment Hero Banner */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-5 sm:p-6 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+        <div className="space-y-1.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
               Ergonomic Engineering Dashboard
             </h1>
-            <span className="text-[11px] bg-slate-100 text-slate-700 font-semibold px-2 py-0.5 rounded border border-slate-200">
+            <span className="text-[11px] bg-red-50 text-red-700 font-bold px-2.5 py-0.5 rounded-full border border-red-200">
               {assessment.title}
             </span>
           </div>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Evaluated by {assessment.assessor} on {assessment.date} • Task: {assessment.taskType}
+          <p className="text-xs text-slate-500 font-medium">
+            Assessor: <strong className="text-slate-700">{assessment.assessor}</strong> • Task: <strong className="text-slate-700">{assessment.taskType}</strong> • Date: {assessment.date} • Standard: ISO 11226 & RULA
           </p>
         </div>
 
-        {/* Assessment switcher if multiple exist */}
-        {session.assessments.length > 1 && (
-          <div className="flex items-center space-x-2">
-            <span className="text-xs text-slate-500 font-medium">Record:</span>
-            <select
-              value={assessment.assessmentId}
-              onChange={(e) =>
-                dispatch({ type: 'SET_CURRENT_ASSESSMENT', payload: e.target.value })
-              }
-              className="text-xs border border-slate-300 rounded px-2 py-1 bg-white"
-            >
-              {session.assessments.map((a, i) => (
-                <option key={a.assessmentId} value={a.assessmentId}>
-                  #{i + 1}: {a.title} ({a.date})
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Assessment switcher if multiple exist */}
+          {session.assessments.length > 1 && (
+            <div className="flex items-center space-x-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
+              <span className="text-xs text-slate-500 font-medium">Observation:</span>
+              <select
+                value={assessment.assessmentId}
+                onChange={(e) =>
+                  dispatch({ type: 'SET_CURRENT_ASSESSMENT', payload: e.target.value })
+                }
+                className="text-xs border-none bg-transparent font-semibold text-slate-800 focus:ring-0 cursor-pointer"
+              >
+                {session.assessments.map((a, i) => (
+                  <option key={a.assessmentId} value={a.assessmentId}>
+                    #{i + 1}: {a.title} ({a.date})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <button
+            onClick={() => navigate('/report')}
+            className="bg-red-600 hover:bg-red-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-xs flex items-center space-x-2 transition-colors cursor-pointer"
+          >
+            <Award className="w-4 h-4" />
+            <span>Open Technical Report</span>
+          </button>
+        </div>
       </div>
 
-      {/* Navigation Bar with Extended Engineering Tabs */}
-      <div className="border-b border-slate-200 bg-white rounded-t-lg px-2 flex space-x-1 sm:space-x-3 overflow-x-auto scrollbar-none">
-        <button
-          onClick={() => setActiveTab('overview')}
-          className={`py-3 px-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-colors flex items-center space-x-1.5 whitespace-nowrap ${
-            activeTab === 'overview'
-              ? 'border-red-600 text-red-600'
-              : 'border-transparent text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <BarChart2 className="w-4 h-4" />
-          <span>Overview</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('image')}
-          className={`py-3 px-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-colors flex items-center space-x-1.5 whitespace-nowrap ${
-            activeTab === 'image'
-              ? 'border-red-600 text-red-600'
-              : 'border-transparent text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <ImageIcon className="w-4 h-4" />
-          <span>Image Analysis</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('angles')}
-          className={`py-3 px-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-colors flex items-center space-x-1.5 whitespace-nowrap ${
-            activeTab === 'angles'
-              ? 'border-red-600 text-red-600'
-              : 'border-transparent text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <Activity className="w-4 h-4" />
-          <span>Angles & Neutral Zones</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('rula')}
-          className={`py-3 px-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-colors flex items-center space-x-1.5 whitespace-nowrap ${
-            activeTab === 'rula'
-              ? 'border-red-600 text-red-600'
-              : 'border-transparent text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <Award className="w-4 h-4" />
-          <span>RULA & Sensitivity</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('wmsd_map')}
-          className={`py-3 px-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-colors flex items-center space-x-1.5 whitespace-nowrap ${
-            activeTab === 'wmsd_map'
-              ? 'border-red-600 text-red-600'
-              : 'border-transparent text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <Flame className="w-4 h-4 text-orange-600" />
-          <span>WMSD Body Map</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('workstation')}
-          className={`py-3 px-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-colors flex items-center space-x-1.5 whitespace-nowrap ${
-            activeTab === 'workstation'
-              ? 'border-red-600 text-red-600'
-              : 'border-transparent text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <Armchair className="w-4 h-4 text-blue-600" />
-          <span>Workstation Fit</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('validation')}
-          className={`py-3 px-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-colors flex items-center space-x-1.5 whitespace-nowrap ${
-            activeTab === 'validation'
-              ? 'border-red-600 text-red-600'
-              : 'border-transparent text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <TrendingUp className="w-4 h-4" />
-          <span>Validation</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('recommendations')}
-          className={`py-3 px-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-colors flex items-center space-x-1.5 whitespace-nowrap ${
-            activeTab === 'recommendations'
-              ? 'border-red-600 text-red-600'
-              : 'border-transparent text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <ShieldAlert className="w-4 h-4" />
-          <span>Corrective Actions & ROI</span>
-        </button>
+      {/* Segmented Pill Tab Bar */}
+      <div className="bg-slate-200/70 p-1.5 rounded-xl flex items-center space-x-1 overflow-x-auto scrollbar-none border border-slate-300/60 shadow-inner">
+        {[
+          { id: 'overview', label: 'Overview', icon: BarChart2 },
+          { id: 'image', label: 'Image Analysis', icon: ImageIcon },
+          { id: 'angles', label: 'Angles & Zones', icon: Activity },
+          { id: 'rula', label: 'RULA & Sensitivity', icon: Award },
+          { id: 'wmsd_map', label: 'WMSD Body Map', icon: Flame, textClass: 'text-orange-500' },
+          { id: 'workstation', label: 'Workstation Fit', icon: Armchair, textClass: 'text-blue-500' },
+          { id: 'validation', label: 'Validation', icon: TrendingUp },
+          { id: 'recommendations', label: 'Corrective Actions', icon: ShieldAlert },
+        ].map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as DashboardTab)}
+              className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all flex items-center space-x-1.5 whitespace-nowrap cursor-pointer ${
+                isActive
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              }`}
+            >
+              <Icon className={`w-3.5 h-3.5 ${tab.textClass || ''}`} />
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Tab Content Panels */}
