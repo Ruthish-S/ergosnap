@@ -21,7 +21,7 @@ This project documents the development, verification, and preliminary validation
 4. An interactive engineering dashboard delivering planar angle visualizations, intermediate matrix breakdowns, and evidence-conditional recommendations; and
 5. An automated client-side technical PDF report and CSV data compiler.
 
-Software verification was conducted via 29 deterministic unit tests with 100% pass rate, and end-to-end continuous integration was deployed to GitHub Pages. This report presents the underlying biomechanical theory, computer vision architecture, mathematical formulations, software design, experimental validation protocol, and explicit scientific limitations of monocular 2D posture screening.
+Software verification was conducted via 38 deterministic unit tests with 100% pass rate, and end-to-end continuous integration was deployed to GitHub Pages. This report presents the underlying biomechanical theory, computer vision architecture, mathematical formulations, software design, experimental validation protocol, and explicit scientific limitations of monocular 2D posture screening.
 
 ---
 
@@ -383,7 +383,7 @@ To prevent the coupling of computer vision, numerical calculations, user interfa
 ```
 +---------------------------------------------------------------------------------------------------+
 | [ LAYER 1: USER INTERFACE ] (React 19, Tailwind CSS v4, Lucide Icons)                             |
-| Upload Page | Pose Analysis & Corrections | Six-Section Dashboard | Validation Mode | Report Page |
+| Upload Page | Pose Analysis & Corrections | eight-section research dashboard | Validation Mode | Report Page |
 +---------------------------------------------------------------------------------------------------+
                                                   |
                                                   v
@@ -487,17 +487,7 @@ The image pipeline begins in [`src/modules/imagePreprocessing.ts`](file:///c:/Us
 4. **Coordinate Normalization:** Coordinates are maintained in fractional space $[0.0, 1.0]$ and dynamically mapped to native display canvas pixels.
 
 ```
-+---------------------------------------------------------------------------------------------------+
-| FIGURE 8.1: IMAGE UPLOAD AND VALIDATION INTERFACE                                                 |
-|                                                                                                   |
-|  [ Upload Area (Drag & Drop) ]                                                                    |
-|  - Validates JPEG/PNG/WebP format (< 20 MB)                                                       |
-|  - Extracts EXIF rotation metadata tag                                                            |
-|  - Generates verified preview strip                                                               |
-|                                                                                                   |
-|  [ Demo Posture Benchmark ]                                                                       |
-|  - One-click synthetic manufacturing posture loader for demonstration                             |
-+---------------------------------------------------------------------------------------------------+
+![Figure 8.1: ErgoSnap Image Upload & File Integrity Validation Interface](screenshots/01_upload_interface.png)
 ```
 *Figure 8.1: Verified ErgoSnap upload interface displaying file metadata, image preview, and synthetic benchmark loader.*
 
@@ -512,15 +502,7 @@ Upon receipt of the 33 normalized coordinates from MediaPipe, [`src/modules/land
   - `unscorable`: Primary limb joints are occluded. Calculations are withheld, and an alert is issued.
 
 ```
-+---------------------------------------------------------------------------------------------------+
-| FIGURE 8.2: INTERACTIVE SKELETON OVERLAY AND JOINT CALLOUTS                                       |
-|                                                                                                   |
-|  [ ImageViewer Component ]                                                                        |
-|  - High-resolution photograph with SVG skeleton overlay                                           |
-|  - Color-coded joint confidence dots: Green (>0.65), Amber (0.50-0.65), Red (<0.50)              |
-|  - Real-time pan and zoom controls (50% to 350%) with reset facility                              |
-|  - Dynamic degree callout badges anchored to anatomical joint vertices                            |
-+---------------------------------------------------------------------------------------------------+
+![Figure 8.2: Monocular Pose Landmark Detection & Manual Inputs Workbench](screenshots/03_pose_landmark_workbench.png)
 ```
 *Figure 8.2: Interactive SVG skeleton overlay rendering joint links and angular callout tags.*
 
@@ -558,20 +540,7 @@ const result = calculateRula(
 ```
 
 ```
-+---------------------------------------------------------------------------------------------------+
-| FIGURE 9.1: RULA MULTI-TABLE INTERMEDIATE BREAKDOWN INTERFACE                                     |
-|                                                                                                   |
-|  [ Group A: Upper Limb ]             [ Group B: Neck / Trunk / Legs ]                             |
-|  - Upper Arm Score: 3                - Neck Score: 3                                              |
-|  - Lower Arm Score: 1                - Trunk Score: 2                                             |
-|  - Wrist Score: 2                    - Leg Support Score: 1                                       |
-|  - Wrist Twist: 1                    - Table B Lookup Result: 3                                   |
-|  - Table A Lookup Result: 4          - Muscle/Force Adjustment: +0                                |
-|  - Muscle/Force Adjustment: +0       - Cumulative Score B: 3                                      |
-|  - Cumulative Score A: 4                                                                          |
-|                                                                                                   |
-|  [ Grand Score Display: 3 / 7 ]       [ Action Level 2: Investigation Needed ]                    |
-+---------------------------------------------------------------------------------------------------+
+![Figure 9.1: Multiaxial RULA Risk Radar Plot & Intervention Sensitivity Simulation](screenshots/07_dashboard_rula_sensitivity.png)
 ```
 *Figure 9.1: RULA scoring breakdown component displaying intermediate matrix lookups and Action Level.*
 
@@ -586,28 +555,19 @@ Verification was established via Vitest unit tests:
 
 # Page 10 — Interactive Dashboard and Statistical Analytics
 
-## 10.1 The Six-Section Dashboard Architecture
+## 10.1 The eight-section research dashboard Architecture
 The interactive dashboard ([`src/pages/DashboardPage.tsx`](file:///c:/Users/ruthi/Downloads/IELP/ergosnap/src/pages/DashboardPage.tsx)) provides six tabbed analysis perspectives:
 
 ```
-+---------------------------------------------------------------------------------------------------+
-| FIGURE 10.1: ERGOSNAP SIX-SECTION ENGINEERING DASHBOARD                                           |
-|                                                                                                   |
-|  [ Tab Navigation: A. Overview | B. Image | C. Angles | D. RULA | E. Validation | F. Actions ]     |
-|                                                                                                   |
-|  +------------------------+------------------------+--------------------------------------------+ |
-|  | Total Photos: 1        | Observation: VALID     | Grand Score: 3 / 7 (Action Level 2)        | |
-|  +------------------------+------------------------+--------------------------------------------+ |
-|                                                                                                   |
-|  [ Section C: Angle Bar Chart (Recharts) ]                                                        |
-|  - Horizontal bars for verified angles (Degrees °)                                                |
-|  - Reference lines at critical thresholds (45°, 90°)                                              |
-|  - Clicking bar highlights anatomical joint on photograph                                         |
-|  - Explicit label list for unavailable/occluded joints (never plotted as zero)                    |
-|                                                                                                   |
-|  [ Section F: Evidence-Linked Recommendations ]                                                   |
-|  - Cards linking observed angle deviations to specific engineering workstation actions            |
-+---------------------------------------------------------------------------------------------------+
+![Figure 10.1: Ergonomic Engineering Analytics Dashboard — Executive Overview & KPIs](screenshots/04_dashboard_overview.png)
+
+![Figure 10.2: ISO 11226 Postural Comfort Zone & Angle Deviation Gauges](screenshots/06_dashboard_angles_neutral_zones.png)
+
+![Figure 10.3: Anatomical Musculoskeletal Disorder (WMSD) Risk Heatmap](screenshots/08_dashboard_wmsd_heatmap.png)
+
+![Figure 10.4: ISO 9241-5 Workstation Dimensional Layout & Biomechanical Torque Analysis](screenshots/09_dashboard_workstation_fit.png)
+
+![Figure 10.5: Lean Ergonomics 2×2 Corrective Action Priority Matrix](screenshots/10_dashboard_corrective_action_matrix.png)
 ```
 *Figure 10.1: Interactive engineering dashboard layout displaying metric summary, angle chart, and action cards.*
 
@@ -633,28 +593,14 @@ The reporting module [`src/modules/reportGenerator.ts`](file:///c:/Users/ruthi/D
 6. **Scientific Limitations & Bibliography:** Explicit limitations regarding 2D perspective and peer-reviewed citations.
 
 ```
-+---------------------------------------------------------------------------------------------------+
-| FIGURE 11.1: SAMPLE EXPORTED A4 TECHNICAL ERGONOMIC REPORT (PDF)                                  |
-|                                                                                                   |
-|  +---------------------------------------------------------------------------------------------+  |
-|  | ERGOSNAP ANALYTICS  |  Technical Ergonomic Assessment Report           ID: a056677-2025      |  |
-|  +---------------------------------------------------------------------------------------------+  |
-|  | Title: Packaging Assembly Workstation         | Assessor: R. Srinivasan, CPE                |  |
-|  | Task: Manual Box Taping & Palletizing         | Date: 2024-10-15                            |  |
-|  +---------------------------------------------------------------------------------------------+  |
-|  | 1. Executive Summary: Valid observation. RULA Grand Score: 3/7 (Action Level 2).             |  |
-|  | 2. Joint Angles Table: Upper Arm (34.5°), Lower Arm (82.1°), Neck (18.4°), Trunk (12.2°).   |  |
-|  | 3. RULA Score Breakdown: Table A (3), Table B (2), Score A (3), Score B (2), Grand Score (3). |  |
-|  | 4. Recommendations: Priority HIGH - Lower conveyor bed by 8 cm to reduce upper arm elevation.|  |
-|  | 5. Scientific Limitations: 2D planar projection. Non-diagnostic screening instrument.         |  |
-|  +---------------------------------------------------------------------------------------------+  |
-|  | Page 1 of 2                                                Generated via ErgoSnap Analytics |  |
-+---------------------------------------------------------------------------------------------------+
+![Figure 11.1: Empirical Statistical Validation Engine & Bland-Altman Agreement Charts](screenshots/11_validation_engine.png)
+
+![Figure 11.2: Official Technical Ergonomic Assessment Publication Document & Vector PDF Export](screenshots/12_technical_report_preview.png)
 ```
 *Figure 11.1: Layout structure of the client-side generated A4 technical PDF report.*
 
 ## 11.2 Verification vs. Validation Distinction
-- **Verification (Software Engineering):** *Did we build the system correctly?* Confirmed by 29 automated Vitest unit tests verifying that equations, boundary clamps, and lookup matrices execute as specified.
+- **Verification (Software Engineering):** *Did we build the system correctly?* Confirmed by 38 automated Vitest unit tests verifying that equations, boundary clamps, and lookup matrices execute as specified.
 - **Validation (Biomechanical Science):** *Does the system measure human posture accurately in the real world?* Requires systematic empirical comparison against independent ground truth (goniometers, motion capture, certified ergonomists).
 
 ## 11.3 Experimental Validation Protocol
@@ -673,8 +619,8 @@ The ErgoSnap Analytics project achieved the development of a functional, verifie
 - Implemented robust 2D vector trigonometry with floating-point clamping and degenerate geometry guards.
 - Implemented the complete McAtamney & Corlett (1993) RULA scoring matrices (Tables A, B, and C).
 - Established a data-quality gate that flags occluded joints and withholds scores when inputs are missing.
-- Built an interactive six-section dashboard and automated client-side A4 PDF report generator.
-- Verified system logic via 29 automated unit tests (100% pass rate) and deployed the static system to GitHub Pages via automated GitHub Actions CI/CD.
+- Built an interactive eight-section research dashboard and automated client-side A4 PDF report generator.
+- Verified system logic via 38 automated unit tests (100% pass rate) and deployed the static system to GitHub Pages via automated GitHub Actions CI/CD.
 
 ## 12.2 Practical Engineering Limitations
 1. **Monocular 2D Projection:** Accurate angle derivation requires camera positioning perpendicular to the anatomical motion plane (sagittal side profile). Frontal camera angles suffer from foreshortening.
