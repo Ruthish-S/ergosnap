@@ -17,6 +17,7 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/test/**/*.test.ts', 'src/test/**/*.test.tsx'],
+    pool: 'threads',
     coverage: {
       reporter: ['text', 'json', 'html'],
       include: ['src/modules/**', 'src/data/**'],
