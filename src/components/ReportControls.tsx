@@ -4,6 +4,13 @@ import type { Assessment } from '../types/assessment';
 import { generateReport, generateCsvExport } from '../modules/reportGenerator';
 
 import { createAnnotatedPostureImage } from '../modules/annotatedImageRenderer';
+import {
+  generateRadarChartDataUrl,
+  generateSensitivityChartDataUrl,
+  generateWmsdHeatmapDataUrl,
+} from '../modules/pdfChartVisualizer';
+import { buildWmsdRiskMap } from '../modules/wmsdRiskMapping';
+import { computeSensitivityAnalysis } from '../modules/sensitivityAnalysis';
 
 interface ReportControlsProps {
   assessment: Assessment;
@@ -38,11 +45,48 @@ export function ReportControls({ assessment }: ReportControlsProps) {
         }
       }
 
-      const doc = generateReport(assessment, annotatedImgDataUrl);
+      // Generate charts for PDF embedding
+      const radarChartUrl = generateRadarChartDataUrl(assessment.rulaAssessment.segmentScores, 500);
+
+      const getAngleVal = (name: string): number | null => {
+        const match = assessment.angles.find((a) =>
+          a.name.toLowerCase().includes(name.toLowerCase()) && a.isValid
+        );
+        return match?.valueDegrees ?? null;
+      };
+
+      const sensitivityReport = computeSensitivityAnalysis(
+        assessment.rulaAssessment,
+        {
+          upperArmDeg: getAngleVal('upper arm'),
+          lowerArmDeg: getAngleVal('lower arm'),
+          wristDeg: getAngleVal('wrist'),
+          neckDeg: getAngleVal('neck'),
+          trunkDeg: getAngleVal('trunk'),
+        },
+        assessment.manualInputs
+      );
+
+      const sensitivityChartUrl = generateSensitivityChartDataUrl(
+        sensitivityReport.entries,
+        650,
+        280
+      );
+
+      const wmsdMap = buildWmsdRiskMap(assessment.rulaAssessment, assessment.angles);
+      const wmsdHeatmapUrl = generateWmsdHeatmapDataUrl(wmsdMap, 400, 420);
+
+      const doc = generateReport(assessment, {
+        annotatedPhotoUrl: annotatedImgDataUrl,
+        radarChartUrl,
+        sensitivityChartUrl,
+        wmsdHeatmapUrl,
+      });
+
       const filename = `ErgoSnap_Report_${assessment.assessmentId.slice(0, 8)}_${assessment.date}.pdf`;
       doc.save(filename);
 
-      setSuccessMessage(`PDF saved as "${filename}" with embedded skeletal analysis`);
+      setSuccessMessage(`PDF saved as "${filename}" with embedded plots, charts & skeletal analysis`);
     } catch (err) {
       setErrorMessage(`Failed to build PDF: ${err instanceof Error ? err.message : String(err)}`);
     } finally {

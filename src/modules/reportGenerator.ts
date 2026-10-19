@@ -5,19 +5,20 @@
  * - Uses jsPDF and jspdf-autotable for client-side A4 technical reporting.
  * - Sourced strictly from the canonical Assessment data object (no recomputing scores).
  * - Implements clean engineering aesthetics: Charcoal (#1A1A2E), Red accent (#DC2626),
- *   page numbers, headers, footers, ISO 11226 neutral zones, CERI indices, and references appendix.
+ *   page numbers, headers, footers, embedded skeletal photographs, visual charts/plots
+ *   (Radar Spider Plot, Sensitivity Bars, Anatomical Heatmap), ISO 11226 neutral zones,
+ *   CERI exposure indices, and authoritative references appendix.
  */
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import type {
-  Assessment,
-} from '../types/assessment';
+import type { Assessment, Recommendation } from '../types/assessment';
 import { REFERENCES } from '../data/references';
 import { RULA_TABLES_VERSION } from '../data/rulaTables';
 import { buildWmsdRiskMap } from './wmsdRiskMapping';
 import { estimateShoulderMomentArm, evaluateExposureRisk } from './biomechanicalAnalysis';
 import { analyzeWorkstationFit } from './workstationRecommender';
+import { computeSensitivityAnalysis } from './sensitivityAnalysis';
 
 const PAGE_WIDTH = 210; // A4 mm
 const PAGE_HEIGHT = 297; // A4 mm
@@ -30,17 +31,52 @@ const COLOR_ACCENT: [number, number, number] = [220, 38, 38]; // Red
 const COLOR_MUTED: [number, number, number] = [100, 100, 115]; // Slate grey
 const COLOR_LIGHT_BG: [number, number, number] = [245, 246, 248];
 
-export function generateReport(assessment: Assessment, annotatedImageDataUrl?: string | null): jsPDF {
+export interface ReportVisualAssets {
+  annotatedPhotoUrl?: string | null;
+  radarChartUrl?: string | null;
+  sensitivityChartUrl?: string | null;
+  wmsdHeatmapUrl?: string | null;
+}
+
+export function generateReport(
+  assessment: Assessment,
+  visualInput?: ReportVisualAssets | string | null
+): jsPDF {
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
     format: 'a4',
   });
 
+  // Normalize visual assets input
+  const visuals: ReportVisualAssets =
+    typeof visualInput === 'string'
+      ? { annotatedPhotoUrl: visualInput }
+      : visualInput || {};
+
   const wmsdMap = buildWmsdRiskMap(assessment.rulaAssessment, assessment.angles);
   const shoulderMoment = estimateShoulderMomentArm(assessment.angles);
   const exposureRisk = evaluateExposureRisk(assessment.rulaAssessment, assessment.manualInputs);
   const workstationFit = analyzeWorkstationFit(assessment.landmarks);
+
+  const getAngleVal = (name: string): number | null => {
+    const match = assessment.angles.find((a) =>
+      a.name.toLowerCase().includes(name.toLowerCase()) && a.isValid
+    );
+    return match?.valueDegrees ?? null;
+  };
+
+  const sensitivityReport = computeSensitivityAnalysis(
+    assessment.rulaAssessment,
+    {
+      upperArmDeg: getAngleVal('upper arm'),
+      lowerArmDeg: getAngleVal('lower arm'),
+      wristDeg: getAngleVal('wrist'),
+      neckDeg: getAngleVal('neck'),
+      trunkDeg: getAngleVal('trunk'),
+    },
+    assessment.manualInputs
+  );
 
   let currentY = MARGIN;
 
@@ -93,7 +129,7 @@ export function generateReport(assessment: Assessment, annotatedImageDataUrl?: s
   const rula = assessment.rulaAssessment;
 
   const summaryText = [
-    `Assessment was conducted using non-invasive 2D landmark tracking (MediaPipe Pose).`,
+    `Assessment was conducted using deterministic 2D landmark tracking (MediaPipe Pose).`,
     `A total of ${validAnglesCount} of ${totalAnglesCount} planar joint angles were successfully evaluated.`,
     rula.isComplete && rula.segmentScores.finalScore !== null
       ? `RULA Grand Score is ${rula.segmentScores.finalScore}/7 (Action Level ${rula.segmentScores.actionLevel}/4).`
@@ -114,8 +150,8 @@ export function generateReport(assessment: Assessment, annotatedImageDataUrl?: s
   doc.text(splitSummary, MARGIN, currentY);
   currentY += splitSummary.length * 4.2 + 5;
 
-  // Visual Posture & Skeletal Joint Tracking (Embedded Photograph)
-  if (annotatedImageDataUrl) {
+  // Section 2: Photographic Posture & Skeletal Joint Tracking (Embedded Photo)
+  if (visuals.annotatedPhotoUrl) {
     try {
       const imgWidthMm = 95;
       const imgHeightMm = (assessment.imageMetadata.height && assessment.imageMetadata.width)
@@ -133,12 +169,10 @@ export function generateReport(assessment: Assessment, annotatedImageDataUrl?: s
       doc.text('2. Photographic Posture & Skeletal Tracking Analysis', MARGIN, currentY);
       currentY += 4;
 
-      // Draw box border around photo
       doc.setDrawColor(200, 205, 215);
       doc.rect(MARGIN, currentY, imgWidthMm + 4, imgHeightMm + 4);
-      doc.addImage(annotatedImageDataUrl, 'JPEG', MARGIN + 2, currentY + 2, imgWidthMm, imgHeightMm);
+      doc.addImage(visuals.annotatedPhotoUrl, 'JPEG', MARGIN + 2, currentY + 2, imgWidthMm, imgHeightMm);
 
-      // Metadata callout next to photo
       const textX = MARGIN + imgWidthMm + 10;
       let textY = currentY + 6;
       doc.setFont('helvetica', 'bold');
@@ -169,7 +203,7 @@ export function generateReport(assessment: Assessment, annotatedImageDataUrl?: s
     }
   }
 
-  // Section: Joint Angle Measurements & ISO 11226 Comparison
+  // Section 3: Joint Angle Measurements & ISO 11226 Comparison
   if (currentY > PAGE_HEIGHT - 65) {
     doc.addPage();
     currentY = MARGIN;
@@ -178,12 +212,10 @@ export function generateReport(assessment: Assessment, annotatedImageDataUrl?: s
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
   doc.setTextColor(...COLOR_PRIMARY);
-  doc.text(annotatedImageDataUrl ? '3. Joint Angle Measurements & ISO 11226 Postural Envelopes' : '2. Joint Angle Measurements & ISO 11226 Postural Envelopes', MARGIN, currentY);
+  doc.text('3. Joint Angle Measurements & ISO 11226 Postural Envelopes', MARGIN, currentY);
   currentY += 3;
 
-
   const angleTableRows = assessment.angles.map((a) => {
-    // Find matching neutral range
     const wmsdReg = wmsdMap.regions.find((r) =>
       a.name.toLowerCase().includes(r.region.split('/')[0].toLowerCase().trim())
     );
@@ -229,8 +261,8 @@ export function generateReport(assessment: Assessment, annotatedImageDataUrl?: s
   // @ts-expect-error autoTable extends doc
   currentY = doc.lastAutoTable.finalY + 7;
 
-  // Section 3: RULA Ergonomic Breakdown
-  if (currentY > PAGE_HEIGHT - 65) {
+  // Section 4: RULA Ergonomic Breakdown & Radar Profile Plot
+  if (currentY > PAGE_HEIGHT - 75) {
     doc.addPage();
     currentY = MARGIN;
   }
@@ -238,8 +270,22 @@ export function generateReport(assessment: Assessment, annotatedImageDataUrl?: s
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
   doc.setTextColor(...COLOR_PRIMARY);
-  doc.text('3. RULA Ergonomic Assessment Breakdown (McAtamney & Corlett, 1993)', MARGIN, currentY);
+  doc.text('4. RULA Posture Audit & Multiaxial Risk Profile', MARGIN, currentY);
   currentY += 3;
+
+  // If radar chart is available, embed it alongside or above RULA breakdown
+  if (visuals.radarChartUrl) {
+    try {
+      const radarWidthMm = 65;
+      const radarHeightMm = 65;
+
+      doc.setDrawColor(220, 225, 230);
+      doc.rect(PAGE_WIDTH - MARGIN - radarWidthMm - 2, currentY, radarWidthMm + 2, radarHeightMm + 2);
+      doc.addImage(visuals.radarChartUrl, 'PNG', PAGE_WIDTH - MARGIN - radarWidthMm - 1, currentY + 1, radarWidthMm, radarHeightMm);
+    } catch (e) {
+      console.warn('Failed to embed radar chart in PDF:', e);
+    }
+  }
 
   const ss = rula.segmentScores;
   const rulaTableRows = [
@@ -269,17 +315,65 @@ export function generateReport(assessment: Assessment, annotatedImageDataUrl?: s
       fontStyle: 'bold',
     },
     bodyStyles: {
-      fontSize: 8,
+      fontSize: 7.8,
       textColor: COLOR_PRIMARY,
     },
+    tableWidth: visuals.radarChartUrl ? CONTENT_WIDTH - 72 : CONTENT_WIDTH,
     margin: { left: MARGIN, right: MARGIN },
   });
 
   // @ts-expect-error autoTable extends doc
-  currentY = doc.lastAutoTable.finalY + 7;
+  currentY = Math.max(doc.lastAutoTable.finalY + 8, visuals.radarChartUrl ? currentY + 70 : doc.lastAutoTable.finalY + 8);
 
-  // Section 4: WMSD Risk Mapping & Biomechanical Load Summary
-  if (currentY > PAGE_HEIGHT - 60) {
+  // Section 5: Intervention Sensitivity Analysis Plot & Table
+  if (sensitivityReport.entries.length > 0) {
+    if (currentY > PAGE_HEIGHT - 65) {
+      doc.addPage();
+      currentY = MARGIN;
+    }
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(...COLOR_PRIMARY);
+    doc.text('5. Ergonomic Intervention Sensitivity Analysis', MARGIN, currentY);
+    currentY += 3;
+
+    if (visuals.sensitivityChartUrl) {
+      try {
+        const sensWidthMm = 110;
+        const sensHeightMm = 50;
+
+        doc.setDrawColor(220, 225, 230);
+        doc.rect(MARGIN, currentY, sensWidthMm + 2, sensHeightMm + 2);
+        doc.addImage(visuals.sensitivityChartUrl, 'PNG', MARGIN + 1, currentY + 1, sensWidthMm, sensHeightMm);
+
+        const sensTextX = MARGIN + sensWidthMm + 8;
+        let sensTextY = currentY + 6;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(...COLOR_PRIMARY);
+        doc.text('Intervention Priority', sensTextX, sensTextY);
+        sensTextY += 5;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.5);
+        doc.setTextColor(...COLOR_MUTED);
+        doc.text(`Top Segment: ${sensitivityReport.topImpactSegment ?? 'None'}`, sensTextX, sensTextY);
+        sensTextY += 5;
+
+        const sensDesc = 'Simulates the reduction in Grand Score if a segment is improved by one score level (McAtamney & Corlett Table C).';
+        const splitSens = doc.splitTextToSize(sensDesc, CONTENT_WIDTH - (sensWidthMm + 10));
+        doc.text(splitSens, sensTextX, sensTextY);
+
+        currentY += sensHeightMm + 8;
+      } catch (e) {
+        console.warn('Failed to embed sensitivity chart in PDF:', e);
+      }
+    }
+  }
+
+  // Section 6: WMSD Risk Mapping & Anatomical Heatmap
+  if (currentY > PAGE_HEIGHT - 70) {
     doc.addPage();
     currentY = MARGIN;
   }
@@ -287,8 +381,21 @@ export function generateReport(assessment: Assessment, annotatedImageDataUrl?: s
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
   doc.setTextColor(...COLOR_PRIMARY);
-  doc.text('4. WMSD Risk Mapping & Biomechanical Load Summary', MARGIN, currentY);
+  doc.text('6. WMSD Risk Mapping & Biomechanical Load Summary', MARGIN, currentY);
   currentY += 3;
+
+  if (visuals.wmsdHeatmapUrl) {
+    try {
+      const wmsdWidthMm = 55;
+      const wmsdHeightMm = 60;
+
+      doc.setDrawColor(220, 225, 230);
+      doc.rect(PAGE_WIDTH - MARGIN - wmsdWidthMm - 2, currentY, wmsdWidthMm + 2, wmsdHeightMm + 2);
+      doc.addImage(visuals.wmsdHeatmapUrl, 'PNG', PAGE_WIDTH - MARGIN - wmsdWidthMm - 1, currentY + 1, wmsdWidthMm, wmsdHeightMm);
+    } catch (e) {
+      console.warn('Failed to embed WMSD heatmap in PDF:', e);
+    }
+  }
 
   const wmsdRows = wmsdMap.regions.map((r) => [
     r.region,
@@ -299,7 +406,7 @@ export function generateReport(assessment: Assessment, annotatedImageDataUrl?: s
 
   autoTable(doc, {
     startY: currentY,
-    head: [['Anatomical Region', 'Risk Level', 'RULA Score', 'Biomechanical Basis']],
+    head: [['Anatomical Region', 'Risk Level', 'Score', 'Biomechanical Basis']],
     body: wmsdRows,
     theme: 'striped',
     headStyles: {
@@ -312,19 +419,20 @@ export function generateReport(assessment: Assessment, annotatedImageDataUrl?: s
       fontSize: 7.5,
       textColor: COLOR_PRIMARY,
     },
+    tableWidth: visuals.wmsdHeatmapUrl ? CONTENT_WIDTH - 62 : CONTENT_WIDTH,
     columnStyles: {
-      0: { cellWidth: 38 },
-      1: { cellWidth: 24, fontStyle: 'bold' },
-      2: { cellWidth: 20 },
-      3: { cellWidth: 92 },
+      0: { cellWidth: 32 },
+      1: { cellWidth: 20, fontStyle: 'bold' },
+      2: { cellWidth: 15 },
+      3: { cellWidth: visuals.wmsdHeatmapUrl ? 45 : 107 },
     },
     margin: { left: MARGIN, right: MARGIN },
   });
 
   // @ts-expect-error autoTable extends doc
-  currentY = doc.lastAutoTable.finalY + 7;
+  currentY = Math.max(doc.lastAutoTable.finalY + 8, visuals.wmsdHeatmapUrl ? currentY + 65 : doc.lastAutoTable.finalY + 8);
 
-  // Section 5: Workstation Anthropometric Fit & Evidence Actions
+  // Section 7: Corrective Action Priority Matrix (2x2 Lean Ergonomics)
   if (currentY > PAGE_HEIGHT - 65) {
     doc.addPage();
     currentY = MARGIN;
@@ -333,17 +441,88 @@ export function generateReport(assessment: Assessment, annotatedImageDataUrl?: s
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
   doc.setTextColor(...COLOR_PRIMARY);
-  doc.text('5. Evidence-Linked Corrective Actions & Workstation Guidance', MARGIN, currentY);
+  doc.text('7. Corrective Action Priority Matrix (Severity vs. Feasibility)', MARGIN, currentY);
   currentY += 3;
 
-  const recRows = assessment.recommendations.map((rec) => [
-    rec.priority.toUpperCase(),
-    rec.observation,
-    rec.evidence,
-    rec.suggestedAction,
-  ]);
+  // Classify recommendations
+  const quickWins: string[] = [];
+  const majorProjects: string[] = [];
+  const housekeeping: string[] = [];
 
-  if (recRows.length > 0) {
+  assessment.recommendations.forEach((rec) => {
+    const isHigh = rec.priority === 'urgent' || rec.priority === 'high';
+    const text = rec.suggestedAction.toLowerCase();
+    const isEasy = text.includes('raise') || text.includes('lower') || text.includes('adjust') || text.includes('reposition') || text.includes('footrest');
+
+    if (isHigh && isEasy) quickWins.push(rec.observation);
+    else if (isHigh && !isEasy) majorProjects.push(rec.observation);
+    else housekeeping.push(rec.observation);
+  });
+
+  const matrixRows = [
+    [
+      'Quadrant I: Quick Wins (High Impact / Rapid Fix)',
+      quickWins.length > 0 ? quickWins.join('; ') : 'No urgent rapid fixes',
+      'Immediate action — high biomechanical benefit with minimal expense.',
+    ],
+    [
+      'Quadrant II: Strategic Redesigns (High Impact / Major Scope)',
+      majorProjects.length > 0 ? majorProjects.join('; ') : 'No major re-engineering items',
+      'Requires workstation restructuring, tooling change, or budget.',
+    ],
+    [
+      'Quadrant III: Housekeeping Adjustments (Moderate / Low Cost)',
+      housekeeping.length > 0 ? housekeeping.join('; ') : 'Postures within acceptable bounds',
+      'Comfort zone fine-tuning during regular maintenance.',
+    ],
+  ];
+
+  autoTable(doc, {
+    startY: currentY,
+    head: [['Matrix Quadrant', 'Identified Postural Risks', 'Engineering Guidance']],
+    body: matrixRows,
+    theme: 'grid',
+    headStyles: {
+      fillColor: COLOR_PRIMARY,
+      textColor: [255, 255, 255],
+      fontSize: 8.5,
+      fontStyle: 'bold',
+    },
+    bodyStyles: {
+      fontSize: 7.5,
+      textColor: COLOR_PRIMARY,
+    },
+    columnStyles: {
+      0: { cellWidth: 50, fontStyle: 'bold' },
+      1: { cellWidth: 60 },
+      2: { cellWidth: 64 },
+    },
+    margin: { left: MARGIN, right: MARGIN },
+  });
+
+  // @ts-expect-error autoTable extends doc
+  currentY = doc.lastAutoTable.finalY + 7;
+
+  // Section 8: Detailed Evidence-Linked Recommendations
+  if (assessment.recommendations.length > 0) {
+    if (currentY > PAGE_HEIGHT - 60) {
+      doc.addPage();
+      currentY = MARGIN;
+    }
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(...COLOR_PRIMARY);
+    doc.text('8. Evidence-Linked Ergonomic Recommendations', MARGIN, currentY);
+    currentY += 3;
+
+    const recRows = assessment.recommendations.map((rec) => [
+      rec.priority.toUpperCase(),
+      rec.observation,
+      rec.evidence,
+      rec.suggestedAction,
+    ]);
+
     autoTable(doc, {
       startY: currentY,
       head: [['Priority', 'Observation', 'Evidence', 'Engineering Action']],
@@ -395,7 +574,7 @@ export function generateReport(assessment: Assessment, annotatedImageDataUrl?: s
     currentY += 3;
   }
 
-  // Section 6: Scientific Limitations & Scope Boundary
+  // Section 9: Scientific Limitations & Scope Boundary
   if (currentY > PAGE_HEIGHT - 55) {
     doc.addPage();
     currentY = MARGIN;
@@ -404,7 +583,7 @@ export function generateReport(assessment: Assessment, annotatedImageDataUrl?: s
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10.5);
   doc.setTextColor(...COLOR_PRIMARY);
-  doc.text('6. Scientific Limitations & Boundaries', MARGIN, currentY);
+  doc.text('9. Scientific Limitations & Scope Boundaries', MARGIN, currentY);
   currentY += 4;
 
   const limitations = [
@@ -424,7 +603,7 @@ export function generateReport(assessment: Assessment, annotatedImageDataUrl?: s
   }
   currentY += 3;
 
-  // Section 7: References
+  // Section 10: Authoritative References
   if (currentY > PAGE_HEIGHT - 45) {
     doc.addPage();
     currentY = MARGIN;
@@ -432,7 +611,7 @@ export function generateReport(assessment: Assessment, annotatedImageDataUrl?: s
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10.5);
-  doc.text('7. Authoritative References', MARGIN, currentY);
+  doc.text('10. Authoritative References', MARGIN, currentY);
   currentY += 3.5;
 
   doc.setFont('helvetica', 'normal');
