@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   BarChart2,
@@ -6,13 +6,9 @@ import {
   Activity,
   Award,
   TrendingUp,
-  FileText,
-  AlertTriangle,
-  CheckCircle,
-  Clock,
-  ArrowRight,
   ShieldAlert,
-  ChevronRight,
+  Flame,
+  Armchair,
 } from 'lucide-react';
 import { useAssessment } from '../context/AssessmentContext';
 import { ImageViewer } from '../components/ImageViewer';
@@ -21,11 +17,26 @@ import { ScoreBreakdown } from '../components/ScoreBreakdown';
 import { ValidationCharts } from '../components/ValidationCharts';
 import { ReportControls } from '../components/ReportControls';
 
+// Enhanced research-based components
+import { RadarScoreChart } from '../components/RadarScoreChart';
+import { RiskHeatmap } from '../components/RiskHeatmap';
+import { NeutralZoneGauge } from '../components/NeutralZoneGauge';
+import { SensitivityChart } from '../components/SensitivityChart';
+import { EvidenceActionMatrix } from '../components/EvidenceActionMatrix';
+import { WorkstationRecommendationsView } from '../components/WorkstationRecommendationsView';
+
+import { buildWmsdRiskMap } from '../modules/wmsdRiskMapping';
+import { computeSensitivityAnalysis } from '../modules/sensitivityAnalysis';
+import { analyzeWorkstationFit } from '../modules/workstationRecommender';
+import { estimateShoulderMomentArm, evaluateExposureRisk } from '../modules/biomechanicalAnalysis';
+
 type DashboardTab =
   | 'overview'
   | 'image'
   | 'angles'
   | 'rula'
+  | 'wmsd_map'
+  | 'workstation'
   | 'validation'
   | 'recommendations';
 
@@ -34,6 +45,49 @@ export default function DashboardPage() {
   const { session, currentAssessment, dispatch } = useAssessment();
   const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
   const [highlightedAngleName, setHighlightedAngleName] = useState<string | null>(null);
+
+  // Compute ergonomic research modules using useMemo
+  const wmsdRiskMap = useMemo(() => {
+    if (!currentAssessment) return null;
+    return buildWmsdRiskMap(currentAssessment.rulaAssessment, currentAssessment.angles);
+  }, [currentAssessment]);
+
+  const sensitivityReport = useMemo(() => {
+    if (!currentAssessment) return null;
+    const getAngleVal = (name: string): number | null => {
+      const match = currentAssessment.angles.find((a) =>
+        a.name.toLowerCase().includes(name.toLowerCase()) && a.isValid
+      );
+      return match?.valueDegrees ?? null;
+    };
+
+    return computeSensitivityAnalysis(
+      currentAssessment.rulaAssessment,
+      {
+        upperArmDeg: getAngleVal('upper arm'),
+        lowerArmDeg: getAngleVal('lower arm'),
+        wristDeg: getAngleVal('wrist'),
+        neckDeg: getAngleVal('neck'),
+        trunkDeg: getAngleVal('trunk'),
+      },
+      currentAssessment.manualInputs
+    );
+  }, [currentAssessment]);
+
+  const workstationRec = useMemo(() => {
+    if (!currentAssessment) return null;
+    return analyzeWorkstationFit(currentAssessment.landmarks);
+  }, [currentAssessment]);
+
+  const shoulderMoment = useMemo(() => {
+    if (!currentAssessment) return null;
+    return estimateShoulderMomentArm(currentAssessment.angles);
+  }, [currentAssessment]);
+
+  const exposureRisk = useMemo(() => {
+    if (!currentAssessment) return null;
+    return evaluateExposureRisk(currentAssessment.rulaAssessment, currentAssessment.manualInputs);
+  }, [currentAssessment]);
 
   if (!currentAssessment) {
     return (
@@ -106,78 +160,102 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* Six Section Navigation Bar */}
-      <div className="border-b border-slate-200 bg-white rounded-t-lg px-2 flex space-x-2 sm:space-x-4 overflow-x-auto">
+      {/* Navigation Bar with Extended Engineering Tabs */}
+      <div className="border-b border-slate-200 bg-white rounded-t-lg px-2 flex space-x-1 sm:space-x-3 overflow-x-auto scrollbar-none">
         <button
           onClick={() => setActiveTab('overview')}
-          className={`py-3 px-3 text-xs sm:text-sm font-semibold border-b-2 transition-colors flex items-center space-x-1.5 whitespace-nowrap ${
+          className={`py-3 px-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-colors flex items-center space-x-1.5 whitespace-nowrap ${
             activeTab === 'overview'
               ? 'border-red-600 text-red-600'
               : 'border-transparent text-slate-600 hover:text-slate-900'
           }`}
         >
           <BarChart2 className="w-4 h-4" />
-          <span>A. Overview</span>
+          <span>Overview</span>
         </button>
 
         <button
           onClick={() => setActiveTab('image')}
-          className={`py-3 px-3 text-xs sm:text-sm font-semibold border-b-2 transition-colors flex items-center space-x-1.5 whitespace-nowrap ${
+          className={`py-3 px-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-colors flex items-center space-x-1.5 whitespace-nowrap ${
             activeTab === 'image'
               ? 'border-red-600 text-red-600'
               : 'border-transparent text-slate-600 hover:text-slate-900'
           }`}
         >
           <ImageIcon className="w-4 h-4" />
-          <span>B. Image Analysis</span>
+          <span>Image Analysis</span>
         </button>
 
         <button
           onClick={() => setActiveTab('angles')}
-          className={`py-3 px-3 text-xs sm:text-sm font-semibold border-b-2 transition-colors flex items-center space-x-1.5 whitespace-nowrap ${
+          className={`py-3 px-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-colors flex items-center space-x-1.5 whitespace-nowrap ${
             activeTab === 'angles'
               ? 'border-red-600 text-red-600'
               : 'border-transparent text-slate-600 hover:text-slate-900'
           }`}
         >
           <Activity className="w-4 h-4" />
-          <span>C. Angle Analysis</span>
+          <span>Angles & Neutral Zones</span>
         </button>
 
         <button
           onClick={() => setActiveTab('rula')}
-          className={`py-3 px-3 text-xs sm:text-sm font-semibold border-b-2 transition-colors flex items-center space-x-1.5 whitespace-nowrap ${
+          className={`py-3 px-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-colors flex items-center space-x-1.5 whitespace-nowrap ${
             activeTab === 'rula'
               ? 'border-red-600 text-red-600'
               : 'border-transparent text-slate-600 hover:text-slate-900'
           }`}
         >
           <Award className="w-4 h-4" />
-          <span>D. RULA Breakdown</span>
+          <span>RULA & Sensitivity</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('wmsd_map')}
+          className={`py-3 px-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-colors flex items-center space-x-1.5 whitespace-nowrap ${
+            activeTab === 'wmsd_map'
+              ? 'border-red-600 text-red-600'
+              : 'border-transparent text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Flame className="w-4 h-4 text-orange-600" />
+          <span>WMSD Body Map</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('workstation')}
+          className={`py-3 px-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-colors flex items-center space-x-1.5 whitespace-nowrap ${
+            activeTab === 'workstation'
+              ? 'border-red-600 text-red-600'
+              : 'border-transparent text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Armchair className="w-4 h-4 text-blue-600" />
+          <span>Workstation Fit</span>
         </button>
 
         <button
           onClick={() => setActiveTab('validation')}
-          className={`py-3 px-3 text-xs sm:text-sm font-semibold border-b-2 transition-colors flex items-center space-x-1.5 whitespace-nowrap ${
+          className={`py-3 px-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-colors flex items-center space-x-1.5 whitespace-nowrap ${
             activeTab === 'validation'
               ? 'border-red-600 text-red-600'
               : 'border-transparent text-slate-600 hover:text-slate-900'
           }`}
         >
           <TrendingUp className="w-4 h-4" />
-          <span>E. Validation Analytics</span>
+          <span>Validation</span>
         </button>
 
         <button
           onClick={() => setActiveTab('recommendations')}
-          className={`py-3 px-3 text-xs sm:text-sm font-semibold border-b-2 transition-colors flex items-center space-x-1.5 whitespace-nowrap ${
+          className={`py-3 px-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-colors flex items-center space-x-1.5 whitespace-nowrap ${
             activeTab === 'recommendations'
               ? 'border-red-600 text-red-600'
               : 'border-transparent text-slate-600 hover:text-slate-900'
           }`}
         >
           <ShieldAlert className="w-4 h-4" />
-          <span>F. Corrective Actions</span>
+          <span>Corrective Actions & ROI</span>
         </button>
       </div>
 
@@ -211,7 +289,7 @@ export default function DashboardPage() {
 
             <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-xs">
               <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                Current RULA Grand Score
+                RULA Grand Score
               </span>
               <div className="text-2xl font-black text-slate-900 mt-1">
                 {rula.isComplete && rula.segmentScores.finalScore !== null
@@ -236,39 +314,98 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* High Priority Findings Banner */}
-          <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-xs space-y-3">
-            <h3 className="text-sm font-bold text-slate-900">Highest-Priority Ergonomic Findings</h3>
-            {assessment.recommendations.length > 0 ? (
-              <div className="space-y-2">
-                {assessment.recommendations.slice(0, 3).map((rec) => (
-                  <div
-                    key={rec.id}
-                    className="p-3 rounded-md border border-slate-200 bg-slate-50 text-xs flex items-start justify-between gap-3"
-                  >
+          {/* Research Radar Chart & Exposure Indicators */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            <div className="lg:col-span-7">
+              <RadarScoreChart segmentScores={rula.segmentScores} />
+            </div>
+
+            <div className="lg:col-span-5 space-y-4">
+              {/* Quick Biomechanical Risk Highlights */}
+              <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-xs space-y-3">
+                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                  Biomechanical Load Highlights
+                </h3>
+
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded border border-slate-200">
                     <div>
-                      <div className="font-semibold text-slate-900">{rec.observation}</div>
-                      <div className="text-slate-600 mt-0.5">{rec.suggestedAction}</div>
+                      <div className="font-semibold text-slate-800">Glenohumeral Torque Index</div>
+                      <div className="text-[11px] text-slate-500">
+                        {shoulderMoment?.dimensionlessMomentIndex !== null
+                          ? `${(shoulderMoment!.dimensionlessMomentIndex! * 100).toFixed(0)}% maximum gravitational envelope`
+                          : 'Not scorable'}
+                      </div>
                     </div>
                     <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold shrink-0 uppercase ${
-                        rec.priority === 'urgent'
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                        shoulderMoment?.riskLevel === 'high'
                           ? 'bg-red-100 text-red-800'
-                          : rec.priority === 'high'
+                          : shoulderMoment?.riskLevel === 'elevated'
                           ? 'bg-orange-100 text-orange-800'
-                          : 'bg-blue-100 text-blue-800'
+                          : 'bg-emerald-100 text-emerald-800'
                       }`}
                     >
-                      {rec.priority}
+                      {shoulderMoment?.riskLevel}
                     </span>
                   </div>
-                ))}
+
+                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded border border-slate-200">
+                    <div>
+                      <div className="font-semibold text-slate-800">Cumulative Exposure (CERI)</div>
+                      <div className="text-[11px] text-slate-500">
+                        {exposureRisk?.ceriScore !== null
+                          ? `${exposureRisk!.ceriScore} / 10.0 scale`
+                          : 'Pending inputs'}
+                      </div>
+                    </div>
+                    <span
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                        exposureRisk?.estimatedShiftExposureRisk === 'critical'
+                          ? 'bg-red-100 text-red-800'
+                          : exposureRisk?.estimatedShiftExposureRisk === 'high'
+                          ? 'bg-orange-100 text-orange-800'
+                          : 'bg-emerald-100 text-emerald-800'
+                      }`}
+                    >
+                      {exposureRisk?.estimatedShiftExposureRisk}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded border border-slate-200">
+                    <div>
+                      <div className="font-semibold text-slate-800">Primary WMSD Concern</div>
+                      <div className="text-[11px] text-slate-500">
+                        {wmsdRiskMap?.primaryRiskRegion ?? 'None identified'}
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-200 text-slate-700">
+                      ISO 11226
+                    </span>
+                  </div>
+                </div>
               </div>
-            ) : (
-              <p className="text-xs text-slate-500">
-                No high-risk findings detected. Posture angles remain within initial comfort envelopes.
-              </p>
-            )}
+
+              {/* Highest Priority Findings */}
+              <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-xs space-y-2">
+                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                  Top Priority Corrective Actions
+                </h3>
+                {assessment.recommendations.length > 0 ? (
+                  assessment.recommendations.slice(0, 2).map((rec) => (
+                    <div
+                      key={rec.id}
+                      className="p-2.5 rounded border border-slate-200 bg-slate-50 text-xs space-y-1"
+                    >
+                      <div className="font-semibold text-slate-900">{rec.observation}</div>
+                      <div className="text-slate-600 text-[11px]">{rec.suggestedAction}</div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-slate-500">No urgent risks detected.</p>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Quick action to PDF */}
@@ -276,7 +413,7 @@ export default function DashboardPage() {
             <div>
               <h4 className="text-sm font-bold">Generate Auditable Engineering Report</h4>
               <p className="text-xs text-slate-300 mt-0.5">
-                Download a formal technical A4 PDF containing exact joint measurements, RULA tables, and limitations.
+                Download a formal technical A4 PDF containing exact joint measurements, RULA tables, ISO 11226 neutral zones, and limitations.
               </p>
             </div>
             <ReportControls assessment={assessment} />
@@ -331,7 +468,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* TAB C: ANGLE ANALYSIS */}
+      {/* TAB C: ANGLE ANALYSIS & NEUTRAL ZONES */}
       {activeTab === 'angles' && (
         <div className="space-y-6">
           <AngleChart
@@ -339,6 +476,9 @@ export default function DashboardPage() {
             onAngleSelected={(name) => setHighlightedAngleName(name)}
             highlightedAngleName={highlightedAngleName}
           />
+
+          {/* ISO 11226 Postural Neutral Zone Indicators */}
+          <NeutralZoneGauge angles={assessment.angles} />
 
           {/* Angles Table */}
           <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-xs">
@@ -383,60 +523,83 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* TAB D: RULA BREAKDOWN */}
+      {/* TAB D: RULA BREAKDOWN & SENSITIVITY */}
       {activeTab === 'rula' && (
-        <ScoreBreakdown rula={assessment.rulaAssessment} />
+        <div className="space-y-6">
+          <ScoreBreakdown rula={assessment.rulaAssessment} />
+          {sensitivityReport && <SensitivityChart sensitivityReport={sensitivityReport} />}
+        </div>
       )}
 
-      {/* TAB E: VALIDATION ANALYTICS */}
+      {/* TAB E: WMSD ANATOMICAL BODY MAP */}
+      {activeTab === 'wmsd_map' && wmsdRiskMap && (
+        <RiskHeatmap riskMap={wmsdRiskMap} />
+      )}
+
+      {/* TAB F: WORKSTATION ANTHROPOMETRIC FIT */}
+      {activeTab === 'workstation' && workstationRec && shoulderMoment && exposureRisk && (
+        <WorkstationRecommendationsView
+          workstationRec={workstationRec}
+          shoulderMoment={shoulderMoment}
+          exposureRisk={exposureRisk}
+        />
+      )}
+
+      {/* TAB G: VALIDATION ANALYTICS */}
       {activeTab === 'validation' && (
         <div className="space-y-4">
           <ValidationCharts assessments={session.assessments} />
         </div>
       )}
 
-      {/* TAB F: RECOMMENDATIONS */}
+      {/* TAB H: RECOMMENDATIONS & ROI MATRIX */}
       {activeTab === 'recommendations' && (
-        <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-xs space-y-4">
-          <h3 className="text-sm font-bold text-slate-900">
-            Evidence-Linked Ergonomic Recommendations
-          </h3>
-          <p className="text-xs text-slate-500">
-            Every suggested engineering intervention is linked to measured joint angles and RULA scoring rules.
-          </p>
+        <div className="space-y-6">
+          {/* 2x2 Lean Ergonomic Matrix */}
+          <EvidenceActionMatrix recommendations={assessment.recommendations} />
 
-          <div className="space-y-4">
-            {assessment.recommendations.map((rec) => (
-              <div
-                key={rec.id}
-                className="border border-slate-200 rounded-lg p-4 bg-slate-50/70 space-y-2 text-xs"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-sm text-slate-900">{rec.observation}</span>
-                  <span
-                    className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                      rec.priority === 'urgent'
-                        ? 'bg-red-100 text-red-800'
-                        : rec.priority === 'high'
-                        ? 'bg-orange-100 text-orange-800'
-                        : 'bg-blue-100 text-blue-800'
-                    }`}
-                  >
-                    {rec.priority} Priority
-                  </span>
-                </div>
+          {/* Full List of Evidence-Based Recommendations */}
+          <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-xs space-y-4">
+            <h3 className="text-sm font-bold text-slate-900">
+              Detailed Evidence-Linked Engineering Actions
+            </h3>
+            <p className="text-xs text-slate-500">
+              Every suggested engineering intervention is linked to measured joint angles and RULA scoring rules.
+            </p>
 
-                <div className="text-slate-600">
-                  <strong>Evidence:</strong> {rec.evidence}
+            <div className="space-y-4">
+              {assessment.recommendations.map((rec) => (
+                <div
+                  key={rec.id}
+                  className="border border-slate-200 rounded-lg p-4 bg-slate-50/70 space-y-2 text-xs"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-sm text-slate-900">{rec.observation}</span>
+                    <span
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                        rec.priority === 'urgent'
+                          ? 'bg-red-100 text-red-800'
+                          : rec.priority === 'high'
+                          ? 'bg-orange-100 text-orange-800'
+                          : 'bg-blue-100 text-blue-800'
+                      }`}
+                    >
+                      {rec.priority} Priority
+                    </span>
+                  </div>
+
+                  <div className="text-slate-600">
+                    <strong>Evidence:</strong> {rec.evidence}
+                  </div>
+                  <div className="text-slate-600">
+                    <strong>Biomechanics Rationale:</strong> {rec.rationale}
+                  </div>
+                  <div className="bg-white p-2.5 rounded border border-slate-200 text-slate-800 font-medium">
+                    <strong>Suggested Action:</strong> {rec.suggestedAction}
+                  </div>
                 </div>
-                <div className="text-slate-600">
-                  <strong>Biomechanics Rationale:</strong> {rec.rationale}
-                </div>
-                <div className="bg-white p-2.5 rounded border border-slate-200 text-slate-800 font-medium">
-                  <strong>Suggested Action:</strong> {rec.suggestedAction}
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       )}
