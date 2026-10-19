@@ -3,6 +3,8 @@ import { Download, FileText, Table, Loader2, AlertCircle, CheckCircle } from 'lu
 import type { Assessment } from '../types/assessment';
 import { generateReport, generateCsvExport } from '../modules/reportGenerator';
 
+import { createAnnotatedPostureImage } from '../modules/annotatedImageRenderer';
+
 interface ReportControlsProps {
   assessment: Assessment;
 }
@@ -22,11 +24,25 @@ export function ReportControls({ assessment }: ReportControlsProps) {
       // Brief micro-yield to allow UI spinner render
       await new Promise((resolve) => setTimeout(resolve, 50));
 
-      const doc = generateReport(assessment);
+      let annotatedImgDataUrl: string | null = null;
+      if (assessment.imageUrl && assessment.landmarks && assessment.landmarks.length > 0) {
+        try {
+          annotatedImgDataUrl = await createAnnotatedPostureImage(
+            assessment.imageUrl,
+            assessment.landmarks,
+            assessment.angles,
+            750
+          );
+        } catch (imgErr) {
+          console.warn('Could not render annotated skeleton image:', imgErr);
+        }
+      }
+
+      const doc = generateReport(assessment, annotatedImgDataUrl);
       const filename = `ErgoSnap_Report_${assessment.assessmentId.slice(0, 8)}_${assessment.date}.pdf`;
       doc.save(filename);
 
-      setSuccessMessage(`PDF saved as "${filename}"`);
+      setSuccessMessage(`PDF saved as "${filename}" with embedded skeletal analysis`);
     } catch (err) {
       setErrorMessage(`Failed to build PDF: ${err instanceof Error ? err.message : String(err)}`);
     } finally {

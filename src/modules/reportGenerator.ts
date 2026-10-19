@@ -30,7 +30,7 @@ const COLOR_ACCENT: [number, number, number] = [220, 38, 38]; // Red
 const COLOR_MUTED: [number, number, number] = [100, 100, 115]; // Slate grey
 const COLOR_LIGHT_BG: [number, number, number] = [245, 246, 248];
 
-export function generateReport(assessment: Assessment): jsPDF {
+export function generateReport(assessment: Assessment, annotatedImageDataUrl?: string | null): jsPDF {
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -114,11 +114,73 @@ export function generateReport(assessment: Assessment): jsPDF {
   doc.text(splitSummary, MARGIN, currentY);
   currentY += splitSummary.length * 4.2 + 5;
 
-  // Section 2: Joint Angle Measurements & ISO 11226 Comparison
+  // Visual Posture & Skeletal Joint Tracking (Embedded Photograph)
+  if (annotatedImageDataUrl) {
+    try {
+      const imgWidthMm = 95;
+      const imgHeightMm = (assessment.imageMetadata.height && assessment.imageMetadata.width)
+        ? Math.min(85, (assessment.imageMetadata.height / assessment.imageMetadata.width) * imgWidthMm)
+        : 72;
+
+      if (currentY + imgHeightMm + 20 > PAGE_HEIGHT) {
+        doc.addPage();
+        currentY = MARGIN;
+      }
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(...COLOR_PRIMARY);
+      doc.text('2. Photographic Posture & Skeletal Tracking Analysis', MARGIN, currentY);
+      currentY += 4;
+
+      // Draw box border around photo
+      doc.setDrawColor(200, 205, 215);
+      doc.rect(MARGIN, currentY, imgWidthMm + 4, imgHeightMm + 4);
+      doc.addImage(annotatedImageDataUrl, 'JPEG', MARGIN + 2, currentY + 2, imgWidthMm, imgHeightMm);
+
+      // Metadata callout next to photo
+      const textX = MARGIN + imgWidthMm + 10;
+      let textY = currentY + 6;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(...COLOR_PRIMARY);
+      doc.text('Pose Detection Summary', textX, textY);
+      textY += 5;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(...COLOR_MUTED);
+      doc.text(`Image: ${assessment.imageMetadata.filename}`, textX, textY); textY += 4;
+      doc.text(`Resolution: ${assessment.imageMetadata.width} × ${assessment.imageMetadata.height} px`, textX, textY); textY += 4;
+      doc.text(`Model: ${assessment.modelInfo.modelName}`, textX, textY); textY += 4;
+      doc.text(`Landmark Completeness: ${(assessment.qualityChecks.landmarkCompleteness * 100).toFixed(0)}%`, textX, textY); textY += 4;
+      doc.text(`View Angle Suitability: ${assessment.qualityChecks.viewSuitability.toUpperCase()}`, textX, textY); textY += 4;
+      doc.text(`Verified Joint Angles: ${validAnglesCount} / ${totalAnglesCount}`, textX, textY); textY += 5;
+
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(7);
+      const disclaimer = 'Skeletal lines and angle badges reflect 2D projected plane estimation via MediaPipe.';
+      const splitDisc = doc.splitTextToSize(disclaimer, CONTENT_WIDTH - (imgWidthMm + 12));
+      doc.text(splitDisc, textX, textY);
+
+      currentY += imgHeightMm + 10;
+    } catch (e) {
+      console.warn('Failed to embed annotated image in PDF:', e);
+    }
+  }
+
+  // Section: Joint Angle Measurements & ISO 11226 Comparison
+  if (currentY > PAGE_HEIGHT - 65) {
+    doc.addPage();
+    currentY = MARGIN;
+  }
+
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
-  doc.text('2. Joint Angle Measurements & ISO 11226 Postural Envelopes', MARGIN, currentY);
+  doc.setTextColor(...COLOR_PRIMARY);
+  doc.text(annotatedImageDataUrl ? '3. Joint Angle Measurements & ISO 11226 Postural Envelopes' : '2. Joint Angle Measurements & ISO 11226 Postural Envelopes', MARGIN, currentY);
   currentY += 3;
+
 
   const angleTableRows = assessment.angles.map((a) => {
     // Find matching neutral range
